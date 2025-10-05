@@ -6,11 +6,6 @@ This project demonstrates how to build and deploy AWS infrastructure automatical
 It provisions both network and application layers, delivering a complete, reproducible, and scalable environment.
 
 
-
-
-
-# Why Infrastructure as Code (IaC)?
-
 Infrastructure as Code (IaC) allows you to:
 
 🚀 Automate AWS resource creation (no manual console setup)
