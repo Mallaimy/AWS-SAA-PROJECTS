@@ -5,6 +5,7 @@
 This project demonstrates how to build and deploy AWS infrastructure automatically using CloudFormation (Infrastructure as Code – IaC).
 It provisions both network and application layers, delivering a complete, reproducible, and scalable environment.
 
+![Alt Text](IaC1.png)
 
 Infrastructure as Code (IaC) allows you to:
 
