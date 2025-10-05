@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: In this CloudFormation template i would like to create the follwing infrasture
+    1 Network layer
+        - create a vpc
+        - create a public subnet
+        - create a private subnet
+        - create an internet gateway
+        - attach this created internet gateway to the vpc
+        - create a public route table in the vpc
+        - ceate a public route inside the RouteTable
+        - and associate this route table with public subnet
+
+    2 Application layer
+        - create a EC2 intance in public subnet
+
+Parameters:
+  MonAmi1:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+
+
+###################################### Resources ##########################################################
+# Create vpc
+Resources:
+  VPC1:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: MonVpc
+
+# create public subnet
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC1
+      CidrBlock: 10.0.0.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: MonReseauxPublic
+
+# create public subnet
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC1
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: MonReseauxPublic
+
+# Create an InternetGetway
+  InternetGateway1:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: MonIGW
+
+  # Attanch the internet getway
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      VpcId: !Ref VPC1
+      InternetGatewayId: !Ref InternetGateway1
+  
+# Public Route table
+  PublicRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC1
+      Tags: 
+        - Key: Name
+          Value: MonRoutetable
+
+  
+# create a route for the internet traffic
+  PublicRoute: 
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway1
+
+# associate this route to the public subnet or it doesn't know how
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable1
+
+# Create security Groupes 
+  SecurityGroupe1:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allow HTTP and SSH traffic " 
+      VpcId: !Ref VPC1
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: webserver-SG
+
+
+
+# create an EC2 Instance in the public subnet
+  webserver:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref MonAmi1
+      InstanceType: t3.micro
+      KeyName: abakar
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          SubnetId: !Ref PublicSubnet1  
+          GroupSet: [!Ref SecurityGroupe1]
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          
+          # Update the system
+
+          yum update -y
+          yum install -y httpd
+          systemctl enable httpd
+          systemctl start httpd
+          echo "<h1>I am  really proud of creating this entire infarstructure by code (IaC)</h1>" > /var/www/html/index.html
+      Tags:
+        - Key: Name
+          Value: MonWebServer
+
+######################## Output #####################################################################
+Outputs:
+  InstancePublicIP:
+    Description: Public Ip of my webserver
+    Value: !GetAtt webserver.PublicIp
+
+  WebURL:
+    Description: URL to access the HTTPD web server
+    Value: !Sub "http://${webserver.PublicDnsName}"
